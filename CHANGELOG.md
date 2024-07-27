@@ -1,3 +1,7 @@
+MountMe | 11.0.2-1
+------------------
+- Update for patch 11.0.2
+
 MountMe | 11.0.0-1
 ------------------
 - Update for patch 11.0.0

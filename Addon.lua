@@ -19,12 +19,6 @@ local _, PLAYER_CLASS = UnitClass("player")
 
 local LibFlyable = LibStub("LibFlyable")
 
-local GetItemCount, GetSpellInfo, IsOutdoors, IsPlayerMoving
-    = GetItemCount, GetSpellInfo, IsOutdoors, IsPlayerMoving
-
-local IsPlayerSpell, IsSpellKnown, IsSubmerged, SecureCmdOptionParse
-    = IsPlayerSpell, IsSpellKnown, IsSubmerged, SecureCmdOptionParse
-
 -- Don't use combat macro conditional because it also considers pets and this sometimes prevents us from mounting even if we are not in combat
 local MOUNT_CONDITION = "[outdoors,nomounted,novehicleui,nomod:" .. MOD_REPAIR_MOUNT .. "]"
 local FORCE_FLYING_MOUNT_CONDITION = "[outdoors,nomounted,novehicleui,mod:" .. MOD_FORCE_FLYING .. ",nomod:" .. MOD_REPAIR_MOUNT .. "]"
@@ -50,7 +44,7 @@ local SpellID = {
 
 local SpellName = {}
 for name, id in pairs(SpellID) do
-	SpellName[name] = GetSpellInfo(id)
+	SpellName[name] = C_Spell.GetSpellInfo(id).name
 end
 
 local ItemID = {
@@ -73,7 +67,7 @@ local function GetOverrideMount()
 
 	-- Magic Broom
 	-- Instant but not usable in combat
-	if ItemName["Magic Broom"] and not combat and GetItemCount(ItemID["Magic Broom"]) > 0 then
+	if ItemName["Magic Broom"] and not combat and C_Item.GetItemCount(ItemID["Magic Broom"]) > 0 then
 		return "/use " .. ItemName["Magic Broom"]
 	end
 
@@ -81,7 +75,7 @@ local function GetOverrideMount()
 	-- Can be summoned in combat
 	for _, zoneAbility in ipairs(C_ZoneAbility.GetActiveAbilities()) do
 		if zoneAbility.spellID == SpellID["Garrison Ability"] then
-			local _, _, _, _, _, _, id = GetSpellInfo(SpellName["Garrison Ability"])
+			local id = C_Spell.GetSpellInfo(SpellName["Garrison Ability"]).spellID
 			if (id == 164222 or id == 165803)
 			and SecureCmdOptionParse(GARRISON_MOUNT_CONDITION)
 			and (combat or not LibFlyable:IsFlyableArea()) then
@@ -207,11 +201,6 @@ do
 		[1442] = true, -- Corridor Creeper
 	}
 
-	local dragonridingMounts = C_MountJournal.GetCollectedDragonridingMounts()
-	for _, value in pairs(dragonridingMounts) do
-		zoneMounts[value] = true
-	end
-
 	local repairMounts = {
 		[280] = true, -- Traveler's Tundra Mammoth
 		[284] = true, -- Traveler's Tundra Mammoth
@@ -300,7 +289,7 @@ do
 
 		if #randoms > 0 then
 			local spellID = randoms[random(#randoms)]
-			return "/cast " .. GetSpellInfo(spellID)
+			return "/cast " .. C_Spell.GetSpellInfo(spellID).name
 		end
 	end
 
@@ -318,7 +307,7 @@ do
 		end
 
 		if preferredSpellID then
-			return "/use " .. GetSpellInfo(preferredSpellID)
+			return "/use " .. C_Spell.GetSpellInfo(preferredSpellID).name
 		end
 	end
 end

@@ -141,7 +141,7 @@ SlashCmdList["MOUNTME"] = function(cmd)
 	return end
 
 	DEFAULT_CHAT_FRAME:AddMessage(string.format("%sMountMe:|r %s %s", NORMAL_FONT_COLOR_CODE,
-		string.format(L["Version %s loaded."], GetAddOnMetadata("MountMe", "Version")),
+		string.format(L["Version %s loaded."], C_AddOns.GetAddOnMetadata("MountMe", "Version")),
 		L["Available commands:"]))
 	DEFAULT_CHAT_FRAME:AddMessage(string.format("- %s%s|r - %s (%s%s|r)", NORMAL_FONT_COLOR_CODE,
 		"char", L["Save favorite mounts per character"],
