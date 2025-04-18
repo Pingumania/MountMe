@@ -1,5 +1,5 @@
 manual-changelog:
-  filename: CHANGELOG.md
+  filename: RECENT_CHANGES.md
   markup-type: markdown
 
 ignore:
