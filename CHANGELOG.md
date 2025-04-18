@@ -1,48 +1,52 @@
-MountMe | 11.0.2-1
+MountMe | v11-fork
+------------------
+- Update for patch 11.1.0
+
+MountMe | v10-fork
 ------------------
 - Update for patch 11.0.2
 
-MountMe | 11.0.0-1
-------------------
+MountMe | v9-fork
+-----------------
 - Update for patch 11.0.0
 
-MountMe | 10.1.0-1
-------------------
-- ToC update for 10.1.0
+MountMe | v8-fork
+-----------------
+- Update for patch 10.1.0
 - Added more flex mounts
 - Fix dragondriding mounts for old content
 
-MountMe | 10.0.7-2
-------------------
+MountMe | v7-fork
+-----------------
 - Fix underwater mounts in Dragonflight zones
 
-MountMe | 10.0.7-1
-------------------
-- ToC update for 10.0.7
+MountMe | v6-fork
+-----------------
+- Update for patch 10.0.7
 - Fix dragonriding support
 
-MountMe | 10.0.5-1
-------------------
-- ToC update for 10.0.5
+MountMe | v5-fork
+-----------------
+- Update for patch 10.0.5
 - Update LibFlyable
 
-MountMe | 10.0.2-1
-------------------
-- ToC update for 10.0.2
+MountMe | v4-fork
+-----------------
+- Update for patch 10.0.2
 - Added initial support for Dragonriding
 
-MountMe | 9.2.0-1
+MountMe | v3-fork
 -----------------
-- ToC update for 9.2.0
-  
-MountMe | 9.1.0-1
------------------
-- Update TOC
+- Update for patch 9.2.0
 
-MountMe | 9.0.5-1
+MountMe | v2-fork
+-----------------
+- Update for patch 9.1.0
+
+MountMe | v1-fork
 -----------------
 - First release of this fork
-- Updated for Shadowlands Patch 9.0.5
+- Update for patch 9.0.5
 - Added support for aquatic mounts underwater
 - Added support for repair mounts
 - Added support for the zone "The Maw"

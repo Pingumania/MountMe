@@ -1,4 +1,4 @@
-## Interface: 110002
+## Interface: 110100
 ## Version: @project-version@
 
 ## Title: MountMe
@@ -6,7 +6,7 @@
 ## Notes-deDE: Ein Button, um zu aufsitzen, absitzen und Reisegestalten verwenden.
 ## Notes-esES: Un botón para montar, desmontar y usar las formas de viaje.
 ## Notes-esMX: Un botón para montar, desmontar y usar las formas de viaje.
-
+## Category: Collections
 ## Author: Pingumania, Phanx
 
 ## SavedVariables: MountMeSettings
