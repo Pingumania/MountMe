@@ -394,7 +394,7 @@ end
 ------------------------------------------------------------------------
 
 local button = CreateFrame("Button", "MountMeButton", nil, "SecureActionButtonTemplate")
-button:RegisterForClicks("AnyUp", "AnyDown")
+button:RegisterForClicks("AnyDown")
 button:SetAttribute("type", "macro")
 
 function button:Update()
@@ -404,7 +404,6 @@ function button:Update()
 		(not IsModifierKeyDown() and GetOverrideMount()) or GetAction() or "",
 		GetCVarBool("autoDismountFlying") and "" or SAFE_DISMOUNT,
 		DISMOUNT
-		-- print("UnitAffectingCombat:", UnitAffectingCombat("player"), "InCombatLockdown:", InCombatLockdown())
 	)))
 end
 
