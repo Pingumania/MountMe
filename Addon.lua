@@ -68,15 +68,16 @@ local mountTypeInfo = {
 	[248] = {99,310,0}, -- flying -- 99 ground to deprioritize in non-flying zones if any non-flying mounts are favorites
 	[254] = {0,0,60},   -- Subdued Seahorse -- +300% swim speed in Vashj'ir, +60% swim speed elsewhere
 	[269] = {100,0,0},  -- Water Striders
-	[284] = {60,0,0},   -- Chauffeured Chopper
+	[284] = {60,60,0},   -- Chauffeured Chopper
 	[398] = {100,99,0}, -- Kua'fon's Harness
-	[402] = {0,310,0},  -- Dragonriding
+	[402] = {99,310,0},  -- Dragonriding
 	[407] = {99,310,60}, -- Deepstar Polyp
 	[408] = {100,99,0}, -- Unsuccessful Prototype Fleetpod
 	[412] = {100,99,0}, -- Ottuks
 	[424] = {99,310,0}, -- Dragonriding
 	[436] = {99,310,0,0}, -- Dragonriding
 	[437] = {99,310,0,0}, -- Dragonriding
+	[445] = {99,310,0,0}, -- Dragonriding
 }
 
 local flexMounts = { -- flying mounts that look OK on the ground
@@ -187,8 +188,16 @@ local mawMaps = {
 }
 
 local mountEncounterMaps = {
-	[2786] = FLYING, -- Amirdrassil: Tindral
-	[2359] = FLYING, -- The Dawnbreaker
+	-- [2786] = FLYING, -- Amirdrassil (Tindral)
+	-- [2359] = FLYING, -- The Dawnbreaker
+	-- [2467] = FLYING, -- Manaforge Omega (Dimensius)
+	[2549] = true, -- Amirdrassil (Tindral)
+	[2662] = true, -- The Dawnbreaker
+	[2810] = true  -- Manaforge Omega (Dimensius)
+}
+
+local zoneOverrides = {
+	[2346] = 460013
 }
 
 local mountIDs = C_MountJournal.GetMountIDs()
@@ -199,7 +208,7 @@ local function IsUnderwater()
 	return (IsSwimming() and ((b==B and a <= -1)))
 end
 
-local function FillMountList(targetType, force)
+local function FillMountList(targetType, ignoreFavorites)
 	-- print("Looking for:", targetType == SWIMMING and "SWIMMING" or targetType == FLYING and "FLYING" or "GROUND")
 	wipe(randoms)
 
@@ -209,10 +218,9 @@ local function FillMountList(targetType, force)
 	for i = 1, #mountIDs do
 		local mountID = mountIDs[i]
 		local name, spellID, _, _, isUsable, _, isFavorite = C_MountJournal.GetMountInfoByID(mountID)
-		isUsable = force and true or isUsable
-		if isUsable and (isFavorite or zoneMounts[mountID]) then
+		if isUsable and (ignoreFavorites or isFavorite or zoneMounts[mountID]) then
 			local _, _, _, _, mountType = C_MountJournal.GetMountInfoExtraByID(mountID)
-			local speed = mountTypeInfo[mountType][targetType]
+			local speed = mountTypeInfo[mountType] and mountTypeInfo[mountType][targetType] or 0
 			if mountType == 232 and not vashjirMaps[mapID] then -- Abyssal Seahorse only works in Vashj'ir
 				speed = -1
 			elseif mountType == 402 and not isFavorite then -- Dragonriding
@@ -220,7 +228,7 @@ local function FillMountList(targetType, force)
 			elseif mawMounts[mountID] then -- The Maw needs special treatment
 				if mawMaps[mapID] and not mawRiding then
 					speed = 101
-				elseif not isFavorite then
+				elseif not (ignoreFavorites or isFavorite) then
 					speed = -1
 				end
 			elseif speed == 99 and flexMounts[mountID] then
@@ -242,15 +250,14 @@ local function FillMountList(targetType, force)
 	return randoms
 end
 
-local function GetMount(targetType)
+local function GetMount(ignoreFavorites)
 	local mapID = C_Map.GetBestMapForUnit("player")
-	local force = targetType and true
-	local targetType = targetType or IsUnderwater() and SWIMMING or LibFlyable:IsFlyableArea() and FLYING or GROUND
-	if vashjirMaps[mapID] and not force then
+	local targetType = IsUnderwater() and SWIMMING or LibFlyable:IsFlyableArea() and FLYING or GROUND
+	if vashjirMaps[mapID] then
 		targetType = SWIMMING
 	end
 
-	FillMountList(targetType, force)
+	FillMountList(targetType, ignoreFavorites or false)
 	if #randoms == 0 and targetType == SWIMMING then
 		-- Fall back to non-swimming mounts
 		targetType = LibFlyable:IsFlyableArea() and FLYING or GROUND
@@ -284,17 +291,21 @@ end
 local function GetOverrideMount()
 	local combat = UnitAffectingCombat("player")
 	local mapID = C_Map.GetBestMapForUnit("player")
+	local _, _, _, _, _, _, _, instanceID = GetInstanceInfo()
 
 	-- Some fights allow mounting mid combat
-	local targetType = mountEncounterMaps[mapID]
-	if targetType ~= nil then
-		return GetMount(targetType)
+	if combat and mountEncounterMaps[instanceID] and LibFlyable:IsAdvancedFlyableArea() then
+		return GetMount() or GetMount(true)
+	end
+
+	if zoneOverrides[mapID] and IsSpellKnownOrOverridesKnown(zoneOverrides[mapID]) then
+		return "/cast " .. "[nomounted]" .. C_Spell.GetSpellInfo(zoneOverrides[mapID]).name
 	end
 
 	-- Magic Broom
 	-- Instant but not usable in combat
 	if ItemName["Magic Broom"] and not combat and C_Item.GetItemCount(ItemID["Magic Broom"]) > 0 then
-		return "/use " .. ItemName["Magic Broom"]
+		return "/use " .. "[nomounted]" .. ItemName["Magic Broom"]
 	end
 
 	-- Nagrand garrison mounts: Frostwolf War Wolf, Telaari Talbuk
@@ -357,10 +368,7 @@ if PLAYER_CLASS == "DRUID" then
 			return "/cast " .. SpellName["Travel Form"]
 		end
 
-		local mount = mountOK and not IsPlayerMoving() and GetMount()
-		if mount then
-			return mount
-		elseif IsPlayerSpell(SpellID["Travel Form"]) and (IsOutdoors() or IsSubmerged()) then
+		if IsPlayerSpell(SpellID["Travel Form"]) and (IsOutdoors() or IsSubmerged()) then
 			return "/cast [nomounted] " .. SpellName["Travel Form"]
 		elseif IsPlayerSpell(SpellID["Cat Form"]) then
 			return "/cast [nomounted" .. BLOCKING_FORMS .. "] " .. SpellName["Cat Form"]
@@ -386,7 +394,7 @@ end
 ------------------------------------------------------------------------
 
 local button = CreateFrame("Button", "MountMeButton", nil, "SecureActionButtonTemplate")
-button:RegisterForClicks("AnyDown")
+button:RegisterForClicks("AnyUp", "AnyDown")
 button:SetAttribute("type", "macro")
 
 function button:Update()
@@ -396,6 +404,7 @@ function button:Update()
 		(not IsModifierKeyDown() and GetOverrideMount()) or GetAction() or "",
 		GetCVarBool("autoDismountFlying") and "" or SAFE_DISMOUNT,
 		DISMOUNT
+		-- print("UnitAffectingCombat:", UnitAffectingCombat("player"), "InCombatLockdown:", InCombatLockdown())
 	)))
 end
 
@@ -413,6 +422,7 @@ button:RegisterUnitEvent("PLAYER_SPECIALIZATION_CHANGED", "player")
 button:RegisterEvent("UPDATE_SHAPESHIFT_FORMS")
 button:RegisterEvent("ZONE_CHANGED_NEW_AREA")
 button:RegisterEvent("ZONE_CHANGED")
+button:RegisterEvent("ZONE_CHANGED_INDOORS")
 
 button:SetScript("OnEvent", function(self, event, ...)
 	if event == "PLAYER_LOGIN" then
