@@ -6,5 +6,5 @@ ignore:
   - "*.md"
 
 externals:
-  Libs/LibStub: https://repos.curseforge.com/wow/libstub/trunk
+  Libs/LibStub: https://repos.curseforge.com/wow/ace3/trunk/LibStub
   Libs/LibFlyable: https://github.com/Pingumania/LibFlyable.git
