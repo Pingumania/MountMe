@@ -1,5 +1,4 @@
-## Interface: 110100
-## Version: @project-version@
+## Interface: 110200
 
 ## Title: MountMe
 ## Notes: One button to mount, dismount, and use travel forms.
@@ -8,15 +7,12 @@
 ## Notes-esMX: Un botón para montar, desmontar y usar las formas de viaje.
 ## Category: Collections
 ## Author: Pingumania, Phanx
+## Version: @project-version@
 
 ## SavedVariables: MountMeSettings
 ## SavedVariablesPerCharacter: MountMeFavorites
 
-## OptionalDeps: LibFlyable
-
-#@non-debug@
-# Libs/LibStub/LibStub.lua
-#@end-non-debug@
+Libs/LibStub/LibStub.lua
 Libs/LibFlyable/LibFlyable.lua
 
 Addon.lua
