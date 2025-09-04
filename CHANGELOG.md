@@ -1,3 +1,9 @@
+MountMe | v12-fork
+------------------
+- Update for patch 11.2.0
+- Added support for Undermine G-99 Breakneck
+- Reworked suppport for encounter that require mounts
+
 MountMe | v11-fork
 ------------------
 - Update for patch 11.1.0

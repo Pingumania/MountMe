@@ -19,6 +19,7 @@ local LibFlyable = LibStub("LibFlyable")
 
 -- Don't use combat macro conditional because it also considers pets and this sometimes prevents us from mounting even if we are not in combat
 local MOUNT_CONDITION = "[nomounted,novehicleui,nomod:" .. MOD_REPAIR_MOUNT .. "]"
+local COMBAT_MOUNT_CONDITION = "[nomounted,novehicleui,combat,nomod:" .. MOD_REPAIR_MOUNT .. "]"
 local REPAIR_MOUNT_CONDITION = "[outdoors,mod:" .. MOD_REPAIR_MOUNT .. "]"
 
 local SAFE_DISMOUNT = "/stopmacro [flying,nomod:" .. MOD_DISMOUNT_FLYING .. "]"
@@ -75,9 +76,9 @@ local mountTypeInfo = {
 	[408] = {100,99,0}, -- Unsuccessful Prototype Fleetpod
 	[412] = {100,99,0}, -- Ottuks
 	[424] = {99,310,0}, -- Dragonriding
-	[436] = {99,310,0,0}, -- Dragonriding
-	[437] = {99,310,0,0}, -- Dragonriding
-	[445] = {99,310,0,0}, -- Dragonriding
+	[436] = {99,310,0}, -- Dragonriding
+	[437] = {99,310,0}, -- Dragonriding
+	[445] = {99,310,0}, -- Dragonriding
 }
 
 local flexMounts = { -- flying mounts that look OK on the ground
@@ -188,9 +189,6 @@ local mawMaps = {
 }
 
 local mountEncounterMaps = {
-	-- [2786] = FLYING, -- Amirdrassil (Tindral)
-	-- [2359] = FLYING, -- The Dawnbreaker
-	-- [2467] = FLYING, -- Manaforge Omega (Dimensius)
 	[2549] = true, -- Amirdrassil (Tindral)
 	[2662] = true, -- The Dawnbreaker
 	[2810] = true  -- Manaforge Omega (Dimensius)
@@ -200,6 +198,7 @@ local zoneOverrides = {
 	[2346] = 460013
 }
 
+local dragonridingMountIDs = C_MountJournal.GetCollectedDragonridingMounts()
 local mountIDs = C_MountJournal.GetMountIDs()
 local randoms = {}
 
@@ -208,17 +207,35 @@ local function IsUnderwater()
 	return (IsSwimming() and ((b==B and a <= -1)))
 end
 
-local function FillMountList(targetType, ignoreFavorites)
+local function PickRandomMount(condition)
+	if #randoms > 0 then
+		local spellID = randoms[random(#randoms)]
+		return "/cast " .. condition .. C_Spell.GetSpellInfo(spellID).name
+	end
+end
+
+local function FillDragonridingMountList(ignoreFavorites)
+	wipe(randoms)
+	for i = 1, #dragonridingMountIDs do
+		local mountID = dragonridingMountIDs[i]
+		local name, spellID, _, _, _, _, isFavorite, _, _, shouldHideOnChar = C_MountJournal.GetMountInfoByID(mountID)
+		if isFavorite or ignoreFavorites and not shouldHideOnChar then
+			tinsert(randoms, spellID)
+		end
+	end
+	return randoms
+end
+
+local function FillMountList(targetType)
 	-- print("Looking for:", targetType == SWIMMING and "SWIMMING" or targetType == FLYING and "FLYING" or "GROUND")
 	wipe(randoms)
-
 	local bestSpeed = 0
 	local mapID = C_Map.GetBestMapForUnit("player")
 	local mawRiding = C_QuestLog.IsQuestFlaggedCompleted(63994)
 	for i = 1, #mountIDs do
 		local mountID = mountIDs[i]
-		local name, spellID, _, _, isUsable, _, isFavorite = C_MountJournal.GetMountInfoByID(mountID)
-		if isUsable and (ignoreFavorites or isFavorite or zoneMounts[mountID]) then
+		local name, spellID, _, _, isUsable, _, isFavorite, _, _, _, _, _, isSteadyFlight = C_MountJournal.GetMountInfoByID(mountID)
+		if isUsable and (isFavorite or zoneMounts[mountID]) and not (targetType == FLYING and isSteadyFlight) then
 			local _, _, _, _, mountType = C_MountJournal.GetMountInfoExtraByID(mountID)
 			local speed = mountTypeInfo[mountType] and mountTypeInfo[mountType][targetType] or 0
 			if mountType == 232 and not vashjirMaps[mapID] then -- Abyssal Seahorse only works in Vashj'ir
@@ -228,7 +245,7 @@ local function FillMountList(targetType, ignoreFavorites)
 			elseif mawMounts[mountID] then -- The Maw needs special treatment
 				if mawMaps[mapID] and not mawRiding then
 					speed = 101
-				elseif not (ignoreFavorites or isFavorite) then
+				elseif not (isFavorite) then
 					speed = -1
 				end
 			elseif speed == 99 and flexMounts[mountID] then
@@ -250,24 +267,21 @@ local function FillMountList(targetType, ignoreFavorites)
 	return randoms
 end
 
-local function GetMount(ignoreFavorites)
+local function GetMount()
 	local mapID = C_Map.GetBestMapForUnit("player")
 	local targetType = IsUnderwater() and SWIMMING or LibFlyable:IsFlyableArea() and FLYING or GROUND
 	if vashjirMaps[mapID] then
 		targetType = SWIMMING
 	end
 
-	FillMountList(targetType, ignoreFavorites or false)
+	FillMountList(targetType)
 	if #randoms == 0 and targetType == SWIMMING then
 		-- Fall back to non-swimming mounts
 		targetType = LibFlyable:IsFlyableArea() and FLYING or GROUND
 		FillMountList(targetType)
 	end
 
-	if #randoms > 0 then
-		local spellID = randoms[random(#randoms)]
-		return "/cast " .. MOUNT_CONDITION .. C_Spell.GetSpellInfo(spellID).name
-	end
+	return PickRandomMount(MOUNT_CONDITION)
 end
 
 local function GetRepairMount()
@@ -294,11 +308,15 @@ local function GetOverrideMount()
 	local _, _, _, _, _, _, _, instanceID = GetInstanceInfo()
 
 	-- Some fights allow mounting mid combat
-	if combat and mountEncounterMaps[instanceID] and LibFlyable:IsAdvancedFlyableArea() then
-		return GetMount() or GetMount(true)
+	if combat and mountEncounterMaps[instanceID] then
+		FillDragonridingMountList()
+		if #randoms == 0 then
+			FillDragonridingMountList(true)
+		end
+		return PickRandomMount(MOUNT_CONDITION)
 	end
 
-	if zoneOverrides[mapID] and IsSpellKnownOrOverridesKnown(zoneOverrides[mapID]) then
+	if zoneOverrides[mapID] and C_SpellBook.IsSpellKnownOrOverridesKnown(zoneOverrides[mapID]) then
 		return "/cast " .. "[nomounted]" .. C_Spell.GetSpellInfo(zoneOverrides[mapID]).name
 	end
 
@@ -364,13 +382,13 @@ if PLAYER_CLASS == "DRUID" then
 		end
 
 		local mountOK, flightOK = SecureCmdOptionParse(MOUNT_CONDITION), LibFlyable:IsFlyableArea()
-		if mountOK and flightOK and IsPlayerSpell(SpellID["Travel Form"]) then
+		if mountOK and flightOK and C_SpellBook.IsPlayerSpell(SpellID["Travel Form"]) then
 			return "/cast " .. SpellName["Travel Form"]
 		end
 
-		if IsPlayerSpell(SpellID["Travel Form"]) and (IsOutdoors() or IsSubmerged()) then
+		if C_SpellBook.IsPlayerSpell(SpellID["Travel Form"]) and (IsOutdoors() or IsSubmerged()) then
 			return "/cast [nomounted] " .. SpellName["Travel Form"]
-		elseif IsPlayerSpell(SpellID["Cat Form"]) then
+		elseif C_SpellBook.IsPlayerSpell(SpellID["Cat Form"]) then
 			return "/cast [nomounted" .. BLOCKING_FORMS .. "] " .. SpellName["Cat Form"]
 		end
 	end
@@ -408,6 +426,9 @@ function button:Update()
 end
 
 button:SetScript("PreClick", button.Update)
+button:SetScript("PostClick", function(self)
+    -- print("MountMeButton:", self:GetAttribute("macrotext"))
+end)
 
 ------------------------------------------------------------------------
 
