@@ -316,7 +316,7 @@ local function GetOverrideMount()
 		return PickRandomMount(MOUNT_CONDITION)
 	end
 
-	if zoneOverrides[mapID] and C_SpellBook.IsSpellKnownOrOverridesKnown(zoneOverrides[mapID]) then
+	if zoneOverrides[mapID] and C_SpellBook.IsSpellInSpellBook(zoneOverrides[mapID]) then
 		return "/cast " .. "[nomounted]" .. C_Spell.GetSpellInfo(zoneOverrides[mapID]).name
 	end
 
