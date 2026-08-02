@@ -188,11 +188,30 @@ local mawMaps = {
 	[1961] = true,
 }
 
-local mountEncounterMaps = {
-	[2549] = true, -- Amirdrassil (Tindral)
-	[2662] = true, -- The Dawnbreaker
-	[2810] = true  -- Manaforge Omega (Dimensius)
+-- fights that allow mounting mid combat, keyed by encounterID; true allows any favorited
+-- dragonriding mount, a mountID prefers that one (falling back to any if it isn't usable)
+local encounterMounts = {
+	[2786] = true, -- Tindral Sageswift, Seer of the Flame
+	[3135] = true, -- Dimensius, the All-Devouring
 }
+
+-- instances that stay mountable in combat for the rest of the run once a specific encounter has
+-- been reached, rather than only during that one fight - keyed by instanceID, value is the
+-- encounterID that unlocks it
+local instanceMountUnlocks = {
+	[2662] = 2837, -- The Dawnbreaker, unlocked by Speaker Shadowcrown
+}
+
+-- instances containing any encounterMounts/instanceMountUnlocks entry, so GetEncounterMount()
+-- knows where it is safe to guess if currentEncounterID was lost to a reload mid-fight
+local mountEncounterInstances = {
+	[2549] = true, -- Amirdrassil
+	[2662] = true, -- The Dawnbreaker
+	[2810] = true, -- Manaforge Omega
+}
+
+local currentEncounterID
+local mountsUnlocked
 
 local zoneOverrides = {
 	[2346] = 460013
@@ -302,19 +321,64 @@ local function GetRepairMount()
 	end
 end
 
+local function IsInstanceUnlocked(instanceID)
+	local triggerEncounterID = instanceMountUnlocks[instanceID]
+	if not triggerEncounterID then return false end
+
+	if mountsUnlocked then return true end
+
+	-- reload-proof: this is the server's own lockout record, so it is still correct even if
+	-- mountsUnlocked was lost to a UI reload after the trigger encounter was already killed
+	local _, _, difficultyID = GetInstanceInfo()
+	if C_RaidLocks.IsEncounterComplete(instanceID, triggerEncounterID, difficultyID) then
+		mountsUnlocked = true
+		return true
+	end
+
+	-- covers a reload during the trigger encounter itself, before its kill is recorded, where
+	-- neither of the above can help. IsEncounterInProgress cannot say which encounter it is, so
+	-- trusting it is only safe for instances that unlock on their very first one - anything past
+	-- that point is either the trigger fight or already covered by IsEncounterComplete above
+	if C_InstanceEncounter.IsEncounterInProgress() then
+		mountsUnlocked = true
+		return true
+	end
+
+	return false
+end
+
+local function GetEncounterMount()
+	local _, _, _, _, _, _, _, instanceID = GetInstanceInfo()
+	local allowed = IsInstanceUnlocked(instanceID) or (currentEncounterID and encounterMounts[currentEncounterID])
+
+	-- best-effort fallback: currentEncounterID was lost to a reload mid-fight and there is no way
+	-- to tell which encounter this is, so guess based on being inside a scripted encounter at all,
+	-- rather than offer no mount option for the rest of the pull. Only currentEncounterID being
+	-- nil reaches this - a known encounterID that is simply not listed above still means no
+	if not allowed and not currentEncounterID and mountEncounterInstances[instanceID] then
+		allowed = C_InstanceEncounter.IsEncounterInProgress()
+	end
+
+	if not allowed then return end
+
+	if type(allowed) == "number" then
+		local _, spellID, _, _, isUsable = C_MountJournal.GetMountInfoByID(allowed)
+		if isUsable then
+			return "/cast " .. COMBAT_MOUNT_CONDITION .. C_Spell.GetSpellInfo(spellID).name
+		end
+	end
+
+	FillDragonridingMountList()
+	if #randoms == 0 then
+		FillDragonridingMountList(true)
+	end
+
+	return PickRandomMount(COMBAT_MOUNT_CONDITION)
+end
+
 local function GetOverrideMount()
 	local combat = UnitAffectingCombat("player")
 	local mapID = C_Map.GetBestMapForUnit("player")
-	local _, _, _, _, _, _, _, instanceID = GetInstanceInfo()
-
-	-- Some fights allow mounting mid combat
-	if combat and mountEncounterMaps[instanceID] then
-		FillDragonridingMountList()
-		if #randoms == 0 then
-			FillDragonridingMountList(true)
-		end
-		return PickRandomMount(MOUNT_CONDITION)
-	end
 
 	if zoneOverrides[mapID] and C_SpellBook.IsSpellInSpellBook(zoneOverrides[mapID]) then
 		return "/cast " .. "[nomounted]" .. C_Spell.GetSpellInfo(zoneOverrides[mapID]).name
@@ -419,13 +483,32 @@ function button:Update()
 	if InCombatLockdown() then return end
 
 	self:SetAttribute("macrotext", strtrim(strjoin("\n",
+		GetEncounterMount() or "",
 		(not IsModifierKeyDown() and GetOverrideMount()) or GetAction() or "",
 		GetCVarBool("autoDismountFlying") and "" or SAFE_DISMOUNT,
 		DISMOUNT
 	)))
 end
 
-button:SetScript("PreClick", button.Update)
+-- the encounter-mount line is a guess about whether the current moment of combat actually allows
+-- mounting; if the server rejects it, this hides the resulting error rather than the click itself
+local ERROR_SUPPRESSION_DURATION = 0.5
+
+local function SuppressMountErrors()
+	UIErrorsFrame:UnregisterEvent("UI_ERROR_MESSAGE")
+	C_Timer.After(ERROR_SUPPRESSION_DURATION, function()
+		UIErrorsFrame:RegisterEvent("UI_ERROR_MESSAGE")
+	end)
+end
+
+button:SetScript("PreClick", function(self)
+	self:Update()
+
+	local macrotext = self:GetAttribute("macrotext")
+	if macrotext and macrotext:find(COMBAT_MOUNT_CONDITION, 1, true) then
+		SuppressMountErrors()
+	end
+end)
 button:SetScript("PostClick", function(self)
     -- print("MountMeButton:", self:GetAttribute("macrotext"))
 end)
@@ -438,6 +521,8 @@ button:RegisterEvent("UPDATE_BINDINGS")
 -- button:RegisterEvent("LEARNED_SPELL_IN_TAB")
 button:RegisterEvent("PLAYER_REGEN_DISABLED")
 button:RegisterEvent("PLAYER_REGEN_ENABLED")
+button:RegisterEvent("ENCOUNTER_START")
+button:RegisterEvent("ENCOUNTER_END")
 button:RegisterUnitEvent("PLAYER_SPECIALIZATION_CHANGED", "player")
 button:RegisterEvent("UPDATE_SHAPESHIFT_FORMS")
 button:RegisterEvent("ZONE_CHANGED_NEW_AREA")
@@ -450,6 +535,10 @@ button:SetScript("OnEvent", function(self, event, ...)
 			CollectionsJournal_LoadUI()
 		end
 	elseif event == "UPDATE_BINDINGS" or event == "PLAYER_ENTERING_WORLD" then
+		if event == "PLAYER_ENTERING_WORLD" then
+			mountsUnlocked = nil
+		end
+
 		ClearOverrideBindings(self)
 		local a, b = GetBindingKey("DISMOUNT")
 		if a then
@@ -458,6 +547,16 @@ button:SetScript("OnEvent", function(self, event, ...)
 		if b then
 			SetOverrideBinding(self, false, b, "CLICK MountMeButton:LeftButton")
 		end
+	elseif event == "ENCOUNTER_START" then
+		currentEncounterID = ...
+		local _, _, _, _, _, _, _, instanceID = GetInstanceInfo()
+		if instanceMountUnlocks[instanceID] == currentEncounterID then
+			mountsUnlocked = true
+		end
+		self:Update()
+	elseif event == "ENCOUNTER_END" then
+		currentEncounterID = nil
+		self:Update()
 	else
 		self:Update()
 	end
