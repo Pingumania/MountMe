@@ -6,6 +6,7 @@
 ## Notes-esES: Un botón para montar, desmontar y usar las formas de viaje.
 ## Notes-esMX: Un botón para montar, desmontar y usar las formas de viaje.
 ## Category: Collections
+## IconTexture: Interface\Icons\ability_mount_ridinghorse
 ## Author: Pingumania, Phanx
 ## Version: @project-version@
 
