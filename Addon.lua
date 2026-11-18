@@ -40,7 +40,7 @@ local SpellID = {
 
 local SpellName = {}
 for name, id in pairs(SpellID) do
-	SpellName[name] = C_Spell.GetSpellInfo(id).name
+	SpellName[name] = C_Spell.GetSpellName(id)
 end
 
 local ItemID = {
@@ -79,6 +79,7 @@ local mountTypeInfo = {
 	[436] = {99,310,0}, -- Dragonriding
 	[437] = {99,310,0}, -- Dragonriding
 	[445] = {99,310,0}, -- Dragonriding
+	[471] = {60,0,0}, -- ground 60% (Forever)
 }
 
 local flexMounts = { -- flying mounts that look OK on the ground
